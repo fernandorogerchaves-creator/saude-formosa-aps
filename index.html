@@ -53,7 +53,7 @@ body{margin:0;background:var(--aps-bg);color:var(--aps-tinta);font-family:var(--
 #aps-barra .aps-barra-in{max-width:1280px;margin:0 auto;padding:8px 20px;display:flex;align-items:center;gap:16px;min-height:56px}
 #aps-barra .aps-marca{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;flex:0 0 auto}
 #aps-barra .aps-marca svg{display:block;width:36px;height:36px;flex:0 0 auto}
-#aps-barra .aps-marca img.aps-brasao{display:block;height:46px;width:auto;flex:0 0 auto}
+#aps-barra .aps-marca img.aps-brasao{display:block;height:42px;max-height:42px;width:auto;max-width:36px;object-fit:contain;object-position:center;flex:0 0 auto}
 #aps-barra .aps-marca.com-brasao svg.aps-selo{display:none}
 #aps-barra .aps-marca b{display:block;font-size:16px;font-weight:700;letter-spacing:0}
 #aps-barra .aps-marca small{display:block;font-size:13px;opacity:.82;font-weight:400}
@@ -148,13 +148,13 @@ body{margin:0;background:var(--aps-bg);color:var(--aps-tinta);font-family:var(--
 .aps-rodape p{margin:0}
 .aps-selos{background:var(--aps-sup);color:var(--aps-tinta);border-top:1px solid var(--aps-linha)}
 .aps-selos .aps-in{display:flex;align-items:center;gap:18px;padding:18px 20px;flex-wrap:wrap}
-.aps-selos img{display:block;height:76px;width:auto}
+.aps-selos img{display:block;height:76px;width:auto;max-width:100%;object-fit:contain}\n.aps-selos img[data-logo="brasao"]{height:64px;max-height:64px;width:auto;max-width:52px;object-fit:contain;object-position:center;flex:0 0 auto}
 .aps-selos .aps-logo-aps{margin-left:auto;height:80px}
 .aps-selos-tx{font-size:15px;color:var(--aps-suave);line-height:1.35}
 .aps-rodape .aps-selos-tx b{display:block;color:var(--aps-tinta);font-size:17px}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .aps-selos{background:#F1F5F1;color:#13231B}:root:not([data-theme="light"]) .aps-selos-tx{color:#4F6358}:root:not([data-theme="light"]) .aps-rodape .aps-selos-tx b{color:#13231B}}
 :root[data-theme="dark"] .aps-selos{background:#F1F5F1}
-@media (max-width:560px){.aps-selos img{height:60px}.aps-selos .aps-logo-aps{height:62px;margin-left:0}.aps-selos-tx{flex:1 1 140px}}
+@media (max-width:560px){.aps-selos img{height:60px}.aps-selos img[data-logo="brasao"]{height:54px;max-height:54px;max-width:44px}.aps-selos .aps-logo-aps{height:62px;margin-left:0}.aps-selos-tx{flex:1 1 140px}}
 /* removido */.aps-logos-x{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
 .aps-logo-item{border:1px solid var(--aps-linha);border-radius:12px;padding:14px}
 .aps-logo-item b{display:block;margin-bottom:8px}
