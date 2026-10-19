@@ -47,6 +47,23 @@ body{margin:0;background:var(--aps-bg);color:var(--aps-tinta);font-family:var(--
 .aps-construcao-item b{display:block;margin-bottom:3px}.aps-construcao-acoes{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}.aps-construcao-acoes a{display:inline-flex;min-height:44px;align-items:center;justify-content:center;padding:0 16px;border-radius:10px;text-decoration:none;font-weight:800;border:1px solid var(--aps-linha);color:var(--aps-tinta);background:var(--aps-sup)}
 .aps-home-tool.em-construcao{position:relative;opacity:.78}.aps-home-tool.em-construcao::after{content:'Em construção';position:absolute;top:12px;right:12px;padding:4px 8px;border-radius:999px;background:#FFF4D6;color:#6B4B00;font-size:12px;font-weight:800;border:1px solid #E8D391}
 
+/* identidade institucional - referência visual: documentos oficiais da Prefeitura de Formosa 2025/2026 */
+.aps-institucional{box-sizing:border-box;background:#fff;color:#0B84C6;font-family:var(--aps-fonte);border-bottom:4px solid #0B84C6}
+.aps-institucional *{box-sizing:border-box}
+.aps-institucional-in{max-width:1280px;margin:0 auto;padding:10px 20px 8px;display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:78px}
+.aps-prefeitura-wordmark{display:inline-flex;flex-direction:column;color:#0B84C6;text-decoration:none;line-height:1;min-width:0}
+.aps-prefeitura-wordmark .aps-pm-prefix{font-size:13px;line-height:1.05;letter-spacing:.11em;font-weight:700}
+.aps-prefeitura-wordmark .aps-pm-formosa{font-size:30px;line-height:.98;letter-spacing:-.025em;font-weight:800}
+.aps-prefeitura-wordmark .aps-pm-slogan{margin-top:5px;font-size:8px;line-height:1.1;letter-spacing:.105em;font-weight:700;white-space:nowrap}
+.aps-institucional img.aps-brasao-oficial{display:block;height:58px;width:auto;max-width:52px;object-fit:contain;flex:0 0 auto}
+@media (max-width:560px){
+  .aps-institucional-in{padding:8px 12px 7px;min-height:66px;gap:14px}
+  .aps-prefeitura-wordmark .aps-pm-prefix{font-size:10px}
+  .aps-prefeitura-wordmark .aps-pm-formosa{font-size:24px}
+  .aps-prefeitura-wordmark .aps-pm-slogan{font-size:6px;letter-spacing:.075em;white-space:normal;max-width:245px}
+  .aps-institucional img.aps-brasao-oficial{height:48px;max-width:43px}
+}
+
 /* ---------- barra comum ---------- */
 #aps-barra{box-sizing:border-box;background:var(--aps-verde-esc);color:#fff;font-family:var(--aps-fonte);font-size:15px;line-height:1.25}
 #aps-barra *{box-sizing:border-box}
@@ -54,7 +71,7 @@ body{margin:0;background:var(--aps-bg);color:var(--aps-tinta);font-family:var(--
 #aps-barra .aps-marca{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;flex:0 0 auto}
 #aps-barra .aps-marca svg{display:block;width:36px;height:36px;flex:0 0 auto}
 #aps-barra .aps-marca img.aps-brasao{display:block;height:42px;max-height:42px;width:auto;max-width:36px;object-fit:contain;object-position:center;flex:0 0 auto}
-#aps-barra .aps-marca.com-brasao svg.aps-selo{display:none}
+#aps-barra .aps-marca.com-brasao svg.aps-selo{display:block}
 #aps-barra .aps-marca b{display:block;font-size:16px;font-weight:700;letter-spacing:0}
 #aps-barra .aps-marca small{display:block;font-size:13px;opacity:.82;font-weight:400}
 #aps-barra nav{margin-left:auto;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
@@ -152,6 +169,7 @@ body{margin:0;background:var(--aps-bg);color:var(--aps-tinta);font-family:var(--
 .aps-selos .aps-logo-aps{margin-left:auto;height:80px}
 .aps-selos-tx{font-size:15px;color:var(--aps-suave);line-height:1.35}
 .aps-rodape .aps-selos-tx b{display:block;color:var(--aps-tinta);font-size:17px}
+.aps-selos-slogan{display:block;margin-top:3px;font-size:11px;font-weight:700;letter-spacing:.035em;color:#0B84C6}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .aps-selos{background:#F1F5F1;color:#13231B}:root:not([data-theme="light"]) .aps-selos-tx{color:#4F6358}:root:not([data-theme="light"]) .aps-rodape .aps-selos-tx b{color:#13231B}}
 :root[data-theme="dark"] .aps-selos{background:#F1F5F1}
 @media (max-width:560px){.aps-selos img{height:60px}.aps-selos img[data-logo="brasao"]{height:54px;max-height:54px;max-width:44px}.aps-selos .aps-logo-aps{height:62px;margin-left:0}.aps-selos-tx{flex:1 1 140px}}
@@ -524,6 +542,7 @@ input,select,textarea,button{color-scheme:light}
 </head>
 <body>
 <template id="tpl-casca" data-aps=""><div id="aps-raiz">
+<div class="aps-institucional aps-cromo" aria-label="Prefeitura Municipal de Formosa"><div class="aps-institucional-in"><a class="aps-prefeitura-wordmark" href="https://formosa.go.gov.br/" target="_blank" rel="noopener" aria-label="Prefeitura Municipal de Formosa - site oficial"><span class="aps-pm-prefix">PREFEITURA DE</span><span class="aps-pm-formosa">FORMOSA</span><span class="aps-pm-slogan">RENASCENDO COM CORAGEM, CRESCENDO COM O POVO</span></a><img class="aps-brasao-oficial" data-logo="brasao" alt="Brasão oficial do Município de Formosa"></div></div>
 <header id="aps-barra" class="aps-cromo"><div class="aps-barra-in">
 <a class="aps-marca" href="#/"><img class="aps-brasao" data-logo="brasao" alt="Brasão de Formosa"><svg class="aps-selo" viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" rx="10" fill="rgba(255,255,255,.13)"/><g transform="translate(6 6)" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.2 12 4l9 7.2"/><path d="M5.5 9.5V20h13V9.5"/><path d="M12 11v6M9 14h6" stroke="#68DDBD"/></g></svg><span><b>Saúde Formosa <span class="aps-v10-badge" style="margin-left:6px;background:rgba(255,255,255,.12);color:#fff">v1.0</span></b><small>Secretaria Municipal de Saúde</small></span></a>
 <nav aria-label="Principal"><a href="#/" data-r="inicio">Início</a><a href="#/minha-ubs" data-r="ubs">Minha UBS</a><a href="#/" data-home-open="profissional">Área profissional</a><button type="button" id="aps-home-sair" data-home-logout hidden>Sair</button></nav>
@@ -532,7 +551,7 @@ input,select,textarea,button{color-scheme:light}
 <div id="aps-hero"></div>
 <main id="aps-pagina" tabindex="-1"></main>
 <div id="aps-app"></div>
-<footer id="aps-rodape" class="aps-rodape aps-cromo"><div class="aps-selos"><div class="aps-in"><img data-logo="brasao" alt="Brasão do município de Formosa"><span class="aps-selos-tx"><b>Prefeitura Municipal de Formosa</b>Secretaria Municipal de Saúde</span><span class="aps-selos-dir"><img data-logo="unirv" class="aps-logo-unirv" alt="UniRV – Universidade de Rio Verde"><img data-logo="aps" class="aps-logo-aps" alt="APS – Atenção Primária à Saúde"></span></div></div><div class="aps-in"><p><b>Secretaria Municipal de Saúde de Formosa – GO</b><br><span id="aps-versao"></span><br><span>O portal não mantém cadastro de pacientes; os dados clínicos são usados somente no atendimento em tela.</span><br><span>Portal desenvolvido para a APS de Formosa.</span></p><p><a href="#/" data-home-open="profissional">Área profissional</a></p></div></footer>
+<footer id="aps-rodape" class="aps-rodape aps-cromo"><div class="aps-selos"><div class="aps-in"><img data-logo="brasao" alt="Brasão oficial do Município de Formosa"><span class="aps-selos-tx"><b>Prefeitura Municipal de Formosa</b>Secretaria Municipal de Saúde<small class="aps-selos-slogan">Renascendo com coragem, crescendo com o povo</small></span><span class="aps-selos-dir"><img data-logo="unirv" class="aps-logo-unirv" alt="UniRV – Universidade de Rio Verde"><img data-logo="aps" class="aps-logo-aps" alt="APS – Atenção Primária à Saúde"></span></div></div><div class="aps-in"><p><b>Secretaria Municipal de Saúde de Formosa – GO</b><br><span id="aps-versao"></span><br><span>O portal não mantém cadastro de pacientes; os dados clínicos são usados somente no atendimento em tela.</span><br><span>Portal desenvolvido para a APS de Formosa.</span></p><p><a href="#/" data-home-open="profissional">Área profissional</a></p></div></footer>
 <div class="aps-toast" id="aps-toast" role="status" aria-live="polite"></div>
 </div>
 </template>
