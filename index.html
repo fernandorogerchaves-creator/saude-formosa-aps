@@ -8,6 +8,8 @@
 <meta name="application-name" content="Saúde Formosa – APS v1.0">
 <meta name="description" content="Portal da Atenção Primária à Saúde de Formosa – versão 1.0.">
 <meta name="theme-color" content="#203A46">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://viacep.com.br https://script.google.com; frame-src 'self' data: blob:; form-action 'self'; upgrade-insecure-requests">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -3131,7 +3133,7 @@ APS.abrirEmbed = function(root, chave) {
     frame.srcdoc = htmlEmbed;
     frame.dataset.loaded = '1';
   } catch (e) {
-    console.error(e);
+    /* erro tratado sem registrar detalhes no console do cliente */
     root.innerHTML = '<div class="aps-erro-mod"><div class="aps-nota erro"><p><b>Esta ferramenta não abriu.</b></p><p>Recarregue a página e tente novamente.</p></div></div>';
   }
 };
@@ -3140,6 +3142,74 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&a
 const dig = s => String(s == null ? '' : s).replace(/\D/g, '');
 const clone = o => JSON.parse(JSON.stringify(o));
 APS.esc = esc;
+
+/* ================= segurança de entrada no cliente =================
+   Este build é estático (GitHub Pages): não existe servidor de aplicação neste repositório.
+   As validações abaixo são defesa em profundidade no navegador e não substituem validação
+   server-side quando houver backend/autenticação institucional. */
+const APS_SECURITY = Object.freeze({
+  text(v, max = 512) {
+    return String(v == null ? '' : v)
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+      .slice(0, max);
+  },
+  hash(raw) {
+    const h = String(raw || '#/');
+    if (h === '#' || h === '#/') return '#/';
+    if (h.length > 96) return '#/';
+    const m = h.match(/^#\/([a-z0-9-]{0,32})(?:\?([a-z0-9-]{1,24}))?$/);
+    if (!m) return '#/';
+    const q = m[2] || '';
+    if (q && !(m[1] === 'acs' && ['savassi', 'apgar', 'ad'].includes(q))) return '#/';
+    return '#/' + m[1] + (q ? '?' + q : '');
+  },
+  form(form) {
+    const els = form ? form.querySelectorAll('input,textarea,select') : [];
+    for (const el of els) {
+      if (el.disabled || ['hidden','submit','button','reset','checkbox','radio','file'].includes(el.type)) continue;
+      const v = String(el.value == null ? '' : el.value);
+      const lim = el.maxLength > 0 ? el.maxLength : (el.tagName === 'TEXTAREA' ? 10000 : 512);
+      if (v.length > lim || /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(v)) return {ok:false, el};
+      if (el.type === 'number' && v && !Number.isFinite(Number(v))) return {ok:false, el};
+      if (el.type === 'email' && v && (v.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))) return {ok:false, el};
+      if (el.type === 'url' && v) {
+        try { const u = new URL(v); if (u.protocol !== 'https:') return {ok:false, el}; }
+        catch (_) { return {ok:false, el}; }
+      }
+    }
+    return {ok:true, el:null};
+  },
+  payload(v, depth = 0) {
+    if (depth > 8 || v == null) return v == null ? null : undefined;
+    if (typeof v === 'string') return this.text(v, 10000);
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    if (typeof v === 'boolean') return v;
+    if (Array.isArray(v)) return v.slice(0, 200).map(x => this.payload(x, depth + 1));
+    if (typeof v === 'object') {
+      const out = {};
+      Object.keys(v).slice(0, 200).forEach(k => {
+        if (k === '__proto__' || k === 'prototype' || k === 'constructor') return;
+        out[this.text(k, 80)] = this.payload(v[k], depth + 1);
+      });
+      return out;
+    }
+    return null;
+  },
+  json(v, max = 200000) {
+    const body = JSON.stringify(this.payload(v));
+    if (body.length > max) throw new Error('invalid-payload');
+    return body;
+  }
+});
+APS.security = APS_SECURITY;
+document.addEventListener('submit', function (ev) {
+  const r = APS_SECURITY.form(ev.target);
+  if (r.ok) return;
+  ev.preventDefault();
+  ev.stopImmediatePropagation();
+  if (r.el) { r.el.setAttribute('aria-invalid', 'true'); try { r.el.focus(); } catch (_) {} }
+  if (APS.toast) APS.toast('Entrada inválida. Revise os campos e tente novamente.');
+}, true);
 /* ================= base postal de Formosa — 1.235 CEPs (consolidação de 06/10/2026) =================
    APS_CEPS: [cep, logradouro, bairro, faixa de numeração, nome canônico quando difere do padrão].
    Usada por todos os preenchimentos de CEP do site: CEP → endereço e endereço → CEP. */
@@ -3895,8 +3965,8 @@ function mostrar(r) {
       MODS[r] = el;
       try { APS.modulos[r](el); }
       catch (e) {
-        console.error(e);
-        el.innerHTML = '<div class="aps-erro-mod"><div class="aps-nota erro"><p><b>Esta ferramenta não abriu.</b></p><p>' + esc(e && e.message) + '</p><p>Recarregue a página. Se continuar, avise a coordenação da APS.</p></div></div>';
+        /* erro tratado sem registrar detalhes no console do cliente */
+        el.innerHTML = '<div class="aps-erro-mod"><div class="aps-nota erro"><p><b>Esta ferramenta não abriu.</b></p><p>Ocorreu um erro interno.</p><p>Recarregue a página. Se continuar, avise a coordenação da APS.</p></div></div>';
       }
     } else host.replaceChildren(MODS[r]);
     montarSoapGlobal(MODS[r], r);
@@ -3952,8 +4022,9 @@ function rotaPermitida(r,h){
   return true;
 }
 function rota() {
-  const h = location.hash || '';
-  if (h && !h.startsWith('#/')) return;
+  const bruto = location.hash || '#/';
+  const h = APS_SECURITY.hash(bruto);
+  if (h !== bruto) history.replaceState(null, '', h);
   const r = ROTAS[h.slice(2).split('?')[0]] || 'inicio';
   if (ROTAS_INTERNAS.has(r) && !homeLogged()) {
     APS._depoisDoLogin = h; HOME_VIEW = 'login'; history.replaceState(null, '', '#/'); rotaAtual = null; mostrar('inicio');
@@ -3981,19 +4052,28 @@ const plural = (n, a, b) => n + ' ' + (n === 1 ? a : b);
 const corDe = u => u.tipo === 'distrito' ? '' : (u.cor || '#5B7A6C');
 
 let HOME_VIEW = 'inicio';
+/* Contexto profissional local para organização da interface; NÃO é autenticação.
+   Autenticação real deve ser implementada no servidor com cookie Secure/HttpOnly/SameSite. */
 const HOME_SESSION_KEY = 'saudeFormosa_profissional';
 const HOME_PROFILE_KEY = 'saudeFormosa_perfil';
 const HOME_PROF_KEY = 'saudeFormosa_profissional_ctx';
-function homeLogged(){ try{return sessionStorage.getItem(HOME_SESSION_KEY)==='1'}catch(_){return false} }
-function homeSetLogged(v){ try{if(v)sessionStorage.setItem(HOME_SESSION_KEY,'1');else{sessionStorage.removeItem(HOME_SESSION_KEY);sessionStorage.removeItem(HOME_PROFILE_KEY);sessionStorage.removeItem(HOME_PROF_KEY)}}catch(_){} }
-function homeProfile(){try{return sessionStorage.getItem(HOME_PROFILE_KEY)||''}catch(_){return ''}}
-function homeSetProfile(v){try{sessionStorage.setItem(HOME_PROFILE_KEY,v||'')}catch(_){} }
+const HOME_SESSION_TTL = 2 * 60 * 60 * 1000;
+function homeLogged(){
+  try{
+    const x=JSON.parse(sessionStorage.getItem(HOME_SESSION_KEY)||'null');
+    if(!x||x.v!==1||!Number.isFinite(x.exp)||Date.now()>x.exp){homeSetLogged(false);return false}
+    return true
+  }catch(_){homeSetLogged(false);return false}
+}
+function homeSetLogged(v){ try{if(v)sessionStorage.setItem(HOME_SESSION_KEY,JSON.stringify({v:1,exp:Date.now()+HOME_SESSION_TTL}));else{sessionStorage.removeItem(HOME_SESSION_KEY);sessionStorage.removeItem(HOME_PROFILE_KEY);sessionStorage.removeItem(HOME_PROF_KEY)}}catch(_){} }
+function homeProfile(){try{return APS_SECURITY.text(sessionStorage.getItem(HOME_PROFILE_KEY)||'',32)}catch(_){return ''}}
+function homeSetProfile(v){try{const x=Object.prototype.hasOwnProperty.call(PERFIS,v)?v:'';sessionStorage.setItem(HOME_PROFILE_KEY,x)}catch(_){} }
 function homeUbsObj(cod){return (APS.base&&APS.base.unidades||[]).find(x=>String(x.cod)===String(cod||''))||null}
 function homeEquipes(cod){const u=homeUbsObj(cod);return u&&Array.isArray(u.equipes)?u.equipes.filter(e=>/^\d{10}$/.test(String(e.ine||''))):[]}
 function homeEquipeNome(cod,ine){const e=homeEquipes(cod).find(x=>String(x.ine)===String(ine||''));return e?(e.nome||''):''}
 function homeIneAutomatico(cod,preferido){const eqs=homeEquipes(cod);if(preferido&&eqs.some(e=>e.ine===preferido))return preferido;if(eqs.length===1)return eqs[0].ine;return ''}
 function homeProfessional(){try{const p=JSON.parse(sessionStorage.getItem(HOME_PROF_KEY)||'null')||null;if(!p)return null;const antigo=/^\d{10}$/.test(String(p.equipe||''))?p.equipe:'';p.ine=homeIneAutomatico(p.ubsCod,p.ine||antigo);p.equipe=p.ine||p.equipe||'';p.equipeNome=homeEquipeNome(p.ubsCod,p.ine)||p.equipeNome||'';return p}catch(_){return null}}
-function homeSetProfessional(v){try{const x=Object.assign({},v||{});x.ine=homeIneAutomatico(x.ubsCod,x.ine||(/^\d{10}$/.test(String(x.equipe||''))?x.equipe:''));x.equipe=x.ine||'';x.equipeNome=homeEquipeNome(x.ubsCod,x.ine)||x.equipeNome||'';sessionStorage.setItem(HOME_PROF_KEY,JSON.stringify(x))}catch(_){} }
+function homeSetProfessional(v){try{const x=Object.assign({},v||{});x.nome=APS_SECURITY.text(x.nome,120).trim();x.registro=APS_SECURITY.text(x.registro,60).trim();x.ubsCod=APS_SECURITY.text(x.ubsCod,4).trim();if(!homeUbsObj(x.ubsCod))x.ubsCod='';x.ine=homeIneAutomatico(x.ubsCod,x.ine||(/^\d{10}$/.test(String(x.equipe||''))?x.equipe:''));x.equipe=x.ine||'';x.equipeNome=APS_SECURITY.text(homeEquipeNome(x.ubsCod,x.ine)||x.equipeNome||'',120);x.perfil=Object.prototype.hasOwnProperty.call(PERFIS,x.perfil)?x.perfil:'';sessionStorage.setItem(HOME_PROF_KEY,JSON.stringify(x))}catch(_){} }
 function homeUbsNome(cod){const u=homeUbsObj(cod);return u?u.nome:''}
 function homeUbsOptions(sel){return '<option value="">Selecione a unidade</option>'+(APS.base&&APS.base.unidades||[]).slice().sort((a,b)=>String(a.cod).localeCompare(String(b.cod))).map(u=>`<option value="${esc(u.cod)}" ${String(u.cod)===String(sel||'')?'selected':''}>${esc(u.cod)} – ${esc(u.nome)}</option>`).join('')}
 function homeEquipeOptions(cod,sel){const eqs=homeEquipes(cod);if(!cod)return '<option value="">Selecione primeiro a UBS</option>';if(!eqs.length)return '<option value="">INE não cadastrado nesta UBS</option>';return '<option value="">Selecione a equipe</option>'+eqs.map(e=>`<option value="${esc(e.ine)}" ${String(e.ine)===String(sel||'')?'selected':''}>${esc(e.nome?e.nome+' – INE '+e.ine:'INE '+e.ine)}</option>`).join('')}
@@ -4040,21 +4120,21 @@ function renderInicio0(view){
   if(HOME_VIEW==='profissional'&&!homeLogged())HOME_VIEW='login';
   homeNav();
   if(HOME_VIEW==='login'){
-    pagina.innerHTML=`<section class="aps-home"><button class="home-voltar" type="button" data-home-open="inicio">‹ Voltar ao início</button><div class="aps-home-loginbox"><h1>Área profissional</h1><p>Entre com seus dados. Selecione a UBS e a equipe uma única vez; o INE será usado automaticamente em todo o portal.</p><form id="aps-home-login" novalidate><label for="aps-home-user">CPF ou matrícula</label><input id="aps-home-user" autocomplete="username" inputmode="numeric"><label for="aps-home-pass">Senha</label><input id="aps-home-pass" type="password" autocomplete="current-password"><label for="aps-home-profile">Perfil profissional</label><select id="aps-home-profile"><option value="">Selecione</option>${Object.entries(PERFIS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select><label for="aps-home-prof-name">Nome do profissional</label><input id="aps-home-prof-name" autocomplete="name"><label for="aps-home-prof-reg">Registro profissional / matrícula</label><input id="aps-home-prof-reg"><label for="aps-home-prof-ubs">UBS / serviço</label><select id="aps-home-prof-ubs">${homeUbsOptions('')}</select><label for="aps-home-prof-equipe">Equipe / INE</label><select id="aps-home-prof-equipe"><option value="">Selecione primeiro a UBS</option></select><p class="aps-home-erro" id="aps-home-login-erro" role="alert"></p><button class="aps-home-btn" type="submit" style="--cor:#28786D;--cor-esc:#205F57;width:100%">Entrar</button></form><p class="aps-home-provisorio"><b>Homologação.</b> Para UBS com uma única equipe, o INE é selecionado sozinho. Nas UBS com mais de uma equipe, selecione a sua equipe uma vez.</p></div></section>`;setTimeout(()=>{const u=document.getElementById('aps-home-prof-ubs'),q=document.getElementById('aps-home-prof-equipe');homeBindEquipe(u,q,'');document.getElementById('aps-home-user')?.focus()},0);return;
+    pagina.innerHTML=`<section class="aps-home"><button class="home-voltar" type="button" data-home-open="inicio">‹ Voltar ao início</button><div class="aps-home-loginbox"><h1>Área profissional</h1><p>Identifique seu perfil profissional neste dispositivo. Esta etapa organiza as ferramentas e não substitui autenticação institucional.</p><form id="aps-home-login" novalidate><label for="aps-home-profile">Perfil profissional</label><select id="aps-home-profile"><option value="">Selecione</option>${Object.entries(PERFIS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select><label for="aps-home-prof-name">Nome do profissional</label><input id="aps-home-prof-name" autocomplete="name" maxlength="120"><label for="aps-home-prof-reg">Registro profissional / matrícula</label><input id="aps-home-prof-reg" maxlength="60"><label for="aps-home-prof-ubs">UBS / serviço</label><select id="aps-home-prof-ubs">${homeUbsOptions('')}</select><label for="aps-home-prof-equipe">Equipe / INE</label><select id="aps-home-prof-equipe"><option value="">Selecione primeiro a UBS</option></select><p class="aps-home-erro" id="aps-home-login-erro" role="alert"></p><button class="aps-home-btn" type="submit" style="--cor:#28786D;--cor-esc:#205F57;width:100%">Continuar</button></form><p class="aps-home-provisorio"><b>Segurança:</b> esta versão pública não coleta senha. A identificação fica somente nesta aba por até 2 horas. Autenticação real será liberada apenas com backend institucional.</p></div></section>`;setTimeout(()=>{const u=document.getElementById('aps-home-prof-ubs'),q=document.getElementById('aps-home-prof-equipe');homeBindEquipe(u,q,'');document.getElementById('aps-home-profile')?.focus()},0);return;
   }
   if(HOME_VIEW==='profissional'){
     const p=homeProfile();if(!p){HOME_VIEW='login';renderInicio0('login');return}const fs=FERRAMENTAS.filter(x=>x.roles.includes(p));
     pagina.innerHTML=`<section class="aps-home"><div class="aps-home-title"><span class="aps-role-pill">${esc(PERFIS[p]||'Profissional')}</span><h1>Ferramentas do seu perfil</h1><p>O portal mostra apenas o que está liberado para esta função. Paciente, endereço e SOAP usam componentes compartilhados.</p></div><div class="aps-home-tools simplificada">${fs.map(homeToolHtml).join('')}</div><p class="aps-home-privacy"><b>Versão 1.0:</b> ferramentas sem banco central permanecem disponíveis. Recursos que exigem cadastro longitudinal, compartilhamento entre dispositivos ou administração institucional estão bloqueados como <b>Em construção</b>.</p><p class="aps-home-privacy"><b>Privacidade:</b> o paciente atual existe apenas durante esta sessão de atendimento. Não há cadastro longitudinal no portal.</p></section>`;return;
   }
-  pagina.innerHTML=`<section class="aps-home"><div class="aps-home-title"><h1>Como você quer entrar?</h1><p>Escolha a opção que descreve você.</p></div><div class="aps-home-portas"><article class="aps-home-porta"><span class="aps-home-icone">${homeIcon('usuario')}</span><h2>Sou usuário</h2><p>Digite o seu CEP e descubra sua Unidade Básica de Saúde e o caminho até ela.</p><a class="aps-home-btn" href="#/minha-ubs">Encontrar minha UBS</a></article><article class="aps-home-porta prof"><span class="aps-home-icone">${homeIcon('prof')}</span><h2>Sou profissional</h2><p>Entre uma vez e veja somente as ferramentas autorizadas para o seu perfil.</p><span class="aps-home-login-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Acesso com login</span><button class="aps-home-btn" type="button" data-home-open="profissional">Entrar na área profissional</button></article></div></section>`;
+  pagina.innerHTML=`<section class="aps-home"><div class="aps-home-title"><h1>Como você quer entrar?</h1><p>Escolha a opção que descreve você.</p></div><div class="aps-home-portas"><article class="aps-home-porta"><span class="aps-home-icone">${homeIcon('usuario')}</span><h2>Sou usuário</h2><p>Digite o seu CEP e descubra sua Unidade Básica de Saúde e o caminho até ela.</p><a class="aps-home-btn" href="#/minha-ubs">Encontrar minha UBS</a></article><article class="aps-home-porta prof"><span class="aps-home-icone">${homeIcon('prof')}</span><h2>Sou profissional</h2><p>Identifique seu perfil localmente para organizar as ferramentas disponíveis.</p><span class="aps-home-login-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Identificação local</span><button class="aps-home-btn" type="button" data-home-open="profissional">Entrar na área profissional</button></article></div></section>`;
 }
 document.addEventListener('click',e=>{
   const op=e.target.closest('[data-home-open]');if(op){e.preventDefault();const v=op.dataset.homeOpen||'inicio';HOME_VIEW=v;if(location.hash!=='#/'){location.hash='#/';setTimeout(()=>{if(rotaAtual==='inicio')renderInicio(HOME_VIEW)},0)}else renderInicio(HOME_VIEW);return}
   const out=e.target.closest('[data-home-logout]');if(out){homeSetLogged(false);HOME_VIEW='inicio';CCTX.patient={nome:'',cpf:'',cns:'',nasc:'',sexo:'',telefone:'',cep:'',logradouro:'',numero:'',bairro:'',ubsCod:'',ubs:'',equipe:''};CCTX.encounter=null;if(location.hash!=='#/')location.hash='#/';else renderInicio('inicio');homeNav();renderCtxBar('inicio');APS.toast&&APS.toast('Você saiu da área profissional.')}
 });
 document.addEventListener('submit',e=>{
-  if(e.target.id!=='aps-home-login')return;e.preventDefault();const u=document.getElementById('aps-home-user')?.value.trim(),p=document.getElementById('aps-home-pass')?.value||'',perfil=document.getElementById('aps-home-profile')?.value||'',profNome=document.getElementById('aps-home-prof-name')?.value.trim()||'',profReg=document.getElementById('aps-home-prof-reg')?.value.trim()||'',profUbs=document.getElementById('aps-home-prof-ubs')?.value||'',eqEl=document.getElementById('aps-home-prof-equipe'),profIne=(eqEl&&eqEl.value)||homeIneAutomatico(profUbs,''),err=document.getElementById('aps-home-login-erro');
-  const eqs=homeEquipes(profUbs);if(!u||!p||!perfil||!profNome||!profUbs){if(err)err.textContent='Preencha usuário, senha, perfil, nome e UBS do profissional.';return}if(eqs.length>1&&!profIne){if(err)err.textContent='Selecione a equipe para definir o INE.';return}if(err)err.textContent='';homeSetProfile(perfil);homeSetProfessional({nome:profNome,registro:profReg,ubsCod:profUbs,ubsNome:homeUbsNome(profUbs),ine:profIne,equipe:profIne,equipeNome:homeEquipeNome(profUbs,profIne),perfil});homeSetLogged(true);HOME_VIEW='profissional';homeNav();setTimeout(atualizaIneGlobal,50);if(APS._depoisDoLogin){const h=APS._depoisDoLogin;APS._depoisDoLogin=null;if(rotaPermitida(ROTAS[h.slice(2).split('?')[0]]||'inicio',h)){location.hash=h;return}}renderInicio('profissional')
+  if(e.target.id!=='aps-home-login')return;e.preventDefault();const perfil=document.getElementById('aps-home-profile')?.value||'',profNome=APS_SECURITY.text(document.getElementById('aps-home-prof-name')?.value||'',120).trim(),profReg=APS_SECURITY.text(document.getElementById('aps-home-prof-reg')?.value||'',60).trim(),profUbs=document.getElementById('aps-home-prof-ubs')?.value||'',eqEl=document.getElementById('aps-home-prof-equipe'),profIne=(eqEl&&eqEl.value)||homeIneAutomatico(profUbs,''),err=document.getElementById('aps-home-login-erro');
+  const eqs=homeEquipes(profUbs);if(!Object.prototype.hasOwnProperty.call(PERFIS,perfil)||!profNome||!homeUbsObj(profUbs)){if(err)err.textContent='Preencha perfil, nome e UBS do profissional.';return}if(eqs.length>1&&!/^\d{10}$/.test(profIne)){if(err)err.textContent='Selecione uma equipe válida para definir o INE.';return}if(err)err.textContent='';homeSetProfile(perfil);homeSetProfessional({nome:profNome,registro:profReg,ubsCod:profUbs,ubsNome:homeUbsNome(profUbs),ine:profIne,equipe:profIne,equipeNome:homeEquipeNome(profUbs,profIne),perfil});homeSetLogged(true);HOME_VIEW='profissional';homeNav();setTimeout(atualizaIneGlobal,50);if(APS._depoisDoLogin){const h=APS_SECURITY.hash(APS._depoisDoLogin);APS._depoisDoLogin=null;if(rotaPermitida(ROTAS[h.slice(2).split('?')[0]]||'inicio',h)){location.hash=h;return}}renderInicio('profissional')
 });
 
 /* ================= gestão ================= */
@@ -5893,7 +5973,7 @@ APS.modulos.mamo = function (ROOT) {
   /* ---------- integração gerencial ---------- */
   function gestaoLer() { try { var x = localStorage.getItem(LS_GESTAO); gestaoCfg = x ? JSON.parse(x) : {endpoint:''}; } catch (e) { gestaoCfg = {endpoint:''}; } return gestaoCfg; }
   function gestaoSalvar() { try { localStorage.setItem(LS_GESTAO, JSON.stringify({endpoint:(gestaoCfg.endpoint || '').trim()})); } catch (e) {} gestaoCfgInfo(); }
-  function endpointValido(v) { return /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec(?:\?.*)?$/.test((v || '').trim()); }
+  function endpointValido(v) { return /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/.test((v || '').trim()); }
   function gestaoCfgInfo() {
     var el = $('#gestaoCfgInfo'); if (!el) return;
     if (endpointValido(gestaoCfg.endpoint)) el.innerHTML = '<b>Integração ativa neste computador.</b> A confirmação da solicitação dispara o registro gerencial.';
@@ -5917,7 +5997,7 @@ APS.modulos.mamo = function (ROOT) {
   $('#btnTestarGestao').addEventListener('click', function () {
     var v = $('#gestaoEndpoint').value.trim(); if (!endpointValido(v)) { toast('Configure primeiro a URL /exec'); return; }
     var payload = {tipo:'teste', sistema:'APS Formosa', modulo:'mamografia', em:new Date().toISOString()};
-    fetch(v, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload)})
+    fetch(v, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:APS_SECURITY.json(payload)})
       .then(function () { toast('Teste enviado ao endpoint'); }).catch(function () { toast('Falha ao disparar o teste'); });
   });
 
@@ -6943,7 +7023,7 @@ APS.modulos.mamo = function (ROOT) {
     gestaoLer();
     if (!endpointValido(gestaoCfg.endpoint)) { setGestaoStatus('pendente', 'Integração gerencial não configurada neste computador. A requisição foi gerada normalmente, mas não foi registrada na planilha.'); return Promise.resolve(false); }
     var payload = payloadGestao(); envioGestao.ultimoPayload = payload; setGestaoStatus('pendente', 'Enviando registro para a planilha institucional…');
-    return fetch(gestaoCfg.endpoint, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(payload)})
+    return fetch(gestaoCfg.endpoint, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:APS_SECURITY.json(payload)})
       .then(function () { setGestaoStatus('ok', 'Registro disparado para a planilha institucional. ID: ' + payload.idRegistro + '.'); return true; })
       .catch(function () { setGestaoStatus('erro', 'Não foi possível disparar o registro gerencial. A requisição e o PDF continuam válidos; use “Reenviar”.'); return false; });
   }
@@ -6955,7 +7035,7 @@ APS.modulos.mamo = function (ROOT) {
     var btn = $('#wzSeguir'); btn.disabled = true; btn.textContent = 'Gerando…';
     var r = M.montarCampos(S, ctxFolha()), temMamo = !S.exames || S.exames.mamografia;
     (temMamo ? gerarPdf(r) : Promise.resolve(null)).then(function (res) { ultimo = res; $('#wiz').close(); mostrarResultado(r); if (temMamo) enviarGestao(); })
-      .catch(function (err) { $('#wzErrs').textContent = formErro || 'Não consegui gerar o documento: ' + (err && err.message || err); })
+      .catch(function () { $('#wzErrs').textContent = 'Ocorreu um erro interno ao gerar o documento. Revise os dados e tente novamente.'; })
       .then(function () { btn.disabled = false; btn.textContent = 'Confirmar e gerar'; });
   }
   function antecedentesSoapTexto(){
